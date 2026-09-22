@@ -11,8 +11,7 @@ NDJSON。仓库不包含 iOS/watchOS App 源码，也不包含任何受试者或
 | `receiver_visualizer.py` | UDP 接收、NDJSON 保存、单模态实时可视化和丢包统计 |
 | `run.sh` | 使用 `mobileposer` Conda 环境启动接收器 |
 | `DATA_PROTOCOL.md` | 会话目录、NDJSON、WAV、时间戳和原始/融合数据边界 |
-| `export_watchhar.py` | 将一段 WAV 与 raw 6-axis IMU 对齐并导出 WatchHAR pickle |
-| `make_handoff_bundle.sh` | 把原始会话、协议和处理代码打包，并生成 SHA-256 校验文件 |
+| `make_handoff_bundle.sh` | 把原始会话和数据协议打包，并生成 SHA-256 校验文件 |
 | `environment.yml` | 可复现的 Python/Conda 环境 |
 
 ## 1. 软件使用
@@ -163,32 +162,21 @@ with path.open(encoding="utf-8") as handle:
 `sessionID/source/sensor/sequenceNumber` 识别重复数据。用于严格离线分析时，应优先使用设备导出的
 会话文件，而不是可能丢包的电脑 UDP 录制。
 
-### 3.3 导出 WatchHAR 格式
+### 3.3 通用后处理原则
 
-`export_watchhar.py` 会：
+本仓库保留原始数据和时间锚点，不预设特定模型格式。推荐的通用处理顺序是：
 
-1. 读取同一 source/session 的 raw `accelerometer` 与 raw `gyroscope`；
-2. 按 `timestampUnixNs` 排序、去除重复时间戳；
-3. 使用 `audio_start` 定位 WAV 起点；
-4. 把 IMU 插值到 50 Hz，并裁剪 IMU/WAV 的共同区间；
-5. 输出包含 `IMU`（N×6）和 `Audio`（16 kHz int16）的 pickle，以及同步元数据 JSON。
+1. 根据 `sessionID` 选择同一次会话；
+2. 检查 `session-info.json` 状态和五个预期文件；
+3. 按 `source/sensor/sequenceNumber` 检查缺帧并去除重复事件；
+4. 使用 `timestampUnixNs` 建立跨设备公共时间轴；
+5. 使用对应 source 的 `audio_start.timestampUnixNs` 定位 WAV 第 0 个采样点；
+6. 根据具体任务确定共同时间区间、目标频率、插值和滤波方法；
+7. 将处理结果写入新目录，并保留原始文件、参数与 session ID。
 
-示例：
-
-```bash
-python export_watchhar.py \
-  --events recordings/<session>/iphone-events-<sessionID>.ndjson \
-  --source iphone \
-  --participant 1 \
-  --context Kitchen \
-  --activity Chopping \
-  --trial 1 \
-  --output-dir watchhar_raw
-```
-
-重要限制：该导出器严格要求独立 raw 加速度和 raw 陀螺仪。部分 Apple Watch/watchOS 会话不提供
-独立 `gyroscope` 事件，此时脚本会明确失败；它不会把 `device_motion.rotationRate` 冒充 raw gyro。
-是否允许带标签的融合角速度 fallback，应由具体实验方法决定并另写处理代码。
+不要混淆独立 raw 流和 Apple 融合结果：`accelerometer`、`gyroscope`、`magnetometer` 是独立传感器
+回调；`device_motion` 和 `head_motion` 是融合输出。某模态是否真实可用，应同时检查事件数量及
+`raw_motion_status`，不能只看设备是否含有相关硬件。具体字段和检查规则见 `DATA_PROTOCOL.md`。
 
 ### 3.4 制作可移交数据包
 
@@ -198,7 +186,7 @@ python export_watchhar.py \
   --output exports/sensor_read_handoff_<session>.tar.gz
 ```
 
-压缩包包含选定原始会话、数据协议、导出脚本和 `SHA256SUMS`。接收方可运行：
+压缩包包含选定原始会话、数据协议、说明文件和 `SHA256SUMS`。接收方可运行：
 
 ```bash
 shasum -a 256 -c SHA256SUMS
@@ -209,5 +197,5 @@ shasum -a 256 -c SHA256SUMS
 
 ## 数据安全
 
-`recordings/`、WAV、NDJSON、pickle 和交接压缩包默认被 `.gitignore` 排除。原始音频、位置、健康数据
+`recordings/`、WAV、NDJSON、派生文件和交接压缩包默认被 `.gitignore` 排除。原始音频、位置、健康数据
 可能包含敏感个人信息，上传或共享前应取得受试者授权并进行必要的去标识化处理。

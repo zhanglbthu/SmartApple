@@ -7,8 +7,6 @@ __pycache__/
 # Raw and derived experiment data
 recordings/
 handoff_data/
-watchhar_raw/
-watchhar_validation/
 exports/
 *.ndjson
 *.wav

@@ -10,8 +10,8 @@ usage() {
 Usage:
   ./make_handoff_bundle.sh --session-dir <session-directory> --output <bundle.tar.gz>
 
-The bundle contains DATA_PROTOCOL.md, export_watchhar.py, a README, SHA256SUMS,
-and a copy of the selected raw session directory.
+The bundle contains DATA_PROTOCOL.md, a README, SHA256SUMS, and a copy of the
+selected raw session directory.
 USAGE
 }
 
@@ -49,7 +49,6 @@ output_path=${output_path:A}
 [[ -d "$session_dir" ]] || { echo "session directory not found: $session_dir" >&2; exit 1; }
 [[ -f "$session_dir/session-info.json" ]] || { echo "session-info.json not found in $session_dir" >&2; exit 1; }
 [[ -f "$SCRIPT_DIR/DATA_PROTOCOL.md" ]] || { echo "DATA_PROTOCOL.md not found" >&2; exit 1; }
-[[ -f "$SCRIPT_DIR/export_watchhar.py" ]] || { echo "export_watchhar.py not found" >&2; exit 1; }
 
 session_name=${session_dir:t}
 bundle_name="sensor_read_handoff_${session_name}"
@@ -60,26 +59,17 @@ trap cleanup EXIT
 
 mkdir -p "$staging/raw_session/$session_name"
 cp "$SCRIPT_DIR/DATA_PROTOCOL.md" "$staging/DATA_PROTOCOL.md"
-cp "$SCRIPT_DIR/export_watchhar.py" "$staging/export_watchhar.py"
 cp -R "$session_dir"/* "$staging/raw_session/$session_name/"
 
 cat > "$staging/BUNDLE_README.md" <<EOF
 # Sensor Read handoff bundle
 
-This bundle contains the raw session \`$session_name\`, the acquisition/data protocol,
-and the WatchHAR export bridge. Read \`DATA_PROTOCOL.md\` before processing.
+This bundle contains the raw session \`$session_name\` and the acquisition/data
+protocol. Read \`DATA_PROTOCOL.md\` before processing.
 
-Typical command:
-
-\`\`\`bash
-conda run --no-capture-output -n mobileposer python export_watchhar.py \\
-  --events raw_session/$session_name/apple_watch-events-<sessionID>.ndjson \\
-  --source apple_watch --participant 1 --context Kitchen \\
-  --activity Chopping --trial 1 --output-dir watchhar_raw
-\`\`\`
-
-The raw session files are copied byte-for-byte from the source directory. The
-export command performs alignment/resampling only in the generated output.
+The raw session files are copied byte-for-byte from the source directory. Keep
+them unchanged and write aligned, resampled, filtered, or feature data to a new
+directory together with the processing parameters and source session ID.
 EOF
 
 (cd "$staging" && find . -type f ! -path './SHA256SUMS' -print0 | sort -z | xargs -0 shasum -a 256 > SHA256SUMS)
