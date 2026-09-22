@@ -1,0 +1,21 @@
+.DS_Store
+__pycache__/
+*.py[cod]
+.idea/
+.vscode/
+
+# Raw and derived experiment data
+recordings/
+handoff_data/
+watchhar_raw/
+watchhar_validation/
+exports/
+*.ndjson
+*.wav
+*.pkl
+*.tar.gz
+
+# Local environments
+.venv/
+venv/
+.conda/
